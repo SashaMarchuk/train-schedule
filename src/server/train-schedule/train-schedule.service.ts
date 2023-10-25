@@ -13,8 +13,13 @@ export class TrainScheduleService {
     }
 
     findAll() {
-        return this.prisma.trainSchedule.findMany();
-    }
+        return this.prisma.trainSchedule.findMany({
+                orderBy: {
+                    departure_time: 'asc'
+                },
+            }
+        )
+    };
 
     findAllByUser(userId: number) {
         return this.prisma.trainSchedule.findMany({
@@ -23,6 +28,7 @@ export class TrainScheduleService {
     }
 
     findOne(schedule_id: number) {
+        // TODO: verify user permission
         const schedule = this.prisma.trainSchedule.findUnique({where: {schedule_id}});
         if (!schedule) {
             throw new NotFoundException(`Train schedule with ID ${schedule_id} not found.`);

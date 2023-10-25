@@ -1,80 +1,106 @@
 'use client';
-import React, { FormEvent, SyntheticEvent, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import secureLocalStorage from 'nextjs-secure-local-storage';
-
-type AuthType = 'login' | 'signup';
+import React, { SyntheticEvent, useState } from 'react';
+import { useAuth } from '@/app/utils/hooks';
+import PartialDateTimePicker from '@/app/components/partial/dataTimePicker';
+import { ISchedules, ISelectedDates } from '@/app/types/common';
 
 const CreateSchedule = () => {
-  const [schedule, setSchedule] = useState({});
-  const { schedule: schedule_id } = useParams<Record<string, AuthType>>();
+  const {
+    accessToken,
+    user: { user_id },
+  } = useAuth();
+  const [selectedDates, setSelectedDates] = useState<ISelectedDates>({});
 
-  const { train_name, departure_station, departure_time, arrival_station, arrival_time } = schedule;
-
-  const fetchData = async () => {
-    const {
-      user: { user_id },
-      accessToken,
-    } = secureLocalStorage.getItem('authData');
-    const reqOptions = {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', authorization: `bearer ${accessToken}` },
-    };
-    try {
-      console.log('secureLocalStorage.getItem(): ', secureLocalStorage.getItem('authData'));
-      const response = await fetch(`http://localhost:4000/train-schedule/${schedule_id}`, reqOptions);
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
-      }
-      const schedule = await response.json();
-      setSchedule(schedule);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  };
-
-  const handleSubmit = async (e: SyntheticEvent): FormEvent<HTMLFormElement> => {
+  const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
-    const {
-      user: { user_id },
-      accessToken,
-    } = secureLocalStorage.getItem('authData');
+
+    const departureTime = selectedDates?.departure_time;
+    const arrivalTime = selectedDates?.arrival_time;
 
     const formData = new FormData(e.currentTarget);
-    const bodyData = { ...formData };
 
-    const { accessToken } = secureLocalStorage.getItem('authData');
+    const bodyData: ISchedules = {
+      user_id,
+      departure_time: new Date(departureTime).toISOString(),
+      arrival_time: new Date(arrivalTime).toISOString(),
+    };
+
+    formData.forEach((value, key) => {
+      bodyData[key] = value as string;
+    });
+
+    console.log('bodyData: ', bodyData);
 
     const reqOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', authorization: `bearer ${accessToken}` },
-      body: bodyData,
+      body: JSON.stringify(bodyData),
     };
-    const res = await fetch(`http://localhost:4000/train-schedule/${schedule_id}`, reqOptions);
+    console.log('bodyData: ', bodyData);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API}train-schedule`, reqOptions);
 
-    const { train_name } = await res.json();
+    const { train_name } = await response.json();
     alert(`Train schedule on ${train_name} was created successfully`);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const handleDateChange = (id: string, date: string) => {
+    setSelectedDates((prevDates) => ({ ...prevDates, [id]: date }));
+  };
+
+  const handleUpdateArrivalTime = (date: ISchedules['arrival_time']) => {
+    return handleDateChange('arrival_time', date);
+  };
+
+  const handleUpdateDepartureTime = (date: ISchedules['departure_time']) => {
+    return handleDateChange('departure_time', date);
+  };
 
   return (
-    <form
-      className={'flex items-center justify-center h-screen flex-col h-screen text-gray-800'}
-      onSubmit={handleSubmit}
-    >
-      <input name="train_name" className="form-control mb-1 p-1 rounded" placeholder="Departure Station" />
+    <form className="flex flex-1 items-center justify-center flex-col not:input:text-white" onSubmit={handleSubmit}>
+      <div className="flex flex-col gap-2 mb-4">
+        <label className="flex gap-4 justify-between">
+          Train&nbsp;Name:
+          <input
+            name="train_name"
+            className="form-control p-1 rounded w-full text-gray-800"
+            placeholder="Train Name"
+            required
+          />
+        </label>
+        <label className="flex gap-4 justify-between">
+          Departure&nbsp;Station:
+          <input
+            name="departure_station"
+            className="form-control p-1 w-full rounded text-gray-800"
+            placeholder="Departure Station"
+            required
+          />
+        </label>
 
-      <div className={'flex'}>
-        <input name="departure_station" className="form-control mb-1 p-1 rounded" placeholder="Departure Station" />
-        <input name="departure_time" className="form-control mb-1 p-1 rounded" placeholder="Departure Time" />
-        <input name="arrival_station" className="form-control mb-1 p-1 rounded" placeholder="Arrival Station" />
-        <input name="arrival_time" className="form-control mb-1 p-1 rounded" placeholder="Arrival Time" />
+        <PartialDateTimePicker
+          initialDate={new Date()}
+          onUpdateDateTime={handleUpdateDepartureTime}
+          title={'Departure Time'}
+        />
+
+        <label className="flex gap-4 justify-between">
+          Arrival&nbsp;Station:
+          <input
+            name="arrival_station"
+            className="form-control p-1 w-full rounded text-gray-800"
+            placeholder="Arrival Station"
+            required
+          />
+        </label>
+
+        <PartialDateTimePicker
+          initialDate={new Date()}
+          onUpdateDateTime={handleUpdateArrivalTime}
+          title={'Arrival Time'}
+        />
       </div>
 
-      <button className="w-100 btn btn-lg btn-primary bg-gray-100 px-3 py-1 rounded" type="submit">
+      <button className="btn btn-lg btn-primary bg-gray-100 px-3 py-1 rounded text-gray-800" type="submit">
         Submit
       </button>
     </form>

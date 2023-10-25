@@ -1,7 +1,7 @@
 'use client';
 import React, { SyntheticEvent, useState } from 'react';
-import { useParams } from 'next/navigation';
-import secureLocalStorage from 'nextjs-secure-local-storage';
+import { useParams, useRouter } from 'next/navigation';
+import { checkAuthorization, signIn, signOut } from '@/app/utils/auth';
 
 type AuthType = 'login' | 'signup';
 
@@ -9,9 +9,12 @@ const Auth = () => {
   const [userName, setUserName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const router = useRouter();
 
   const { auth: authType } = useParams<Record<string, AuthType>>();
   const isRegister = authType === 'signup';
+  const isAuthorized = checkAuthorization();
+  isAuthorized && router.push('/schedule');
 
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
@@ -28,13 +31,14 @@ const Auth = () => {
       body: JSON.stringify(bodyData),
     };
 
-    const res = await fetch(`http://localhost:4000/auth/${authType}`, reqOptions);
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API}auth/${authType}`, reqOptions);
 
     const { accessToken, user } = await res.json();
 
     if (accessToken && user) {
-      secureLocalStorage.setItem('authData', { accessToken, user });
-    } else secureLocalStorage.removeItem('authData');
+      signIn({ accessToken, user });
+      router.push('/schedule');
+    } else signOut();
   };
 
   const handleSetUserName = (e) => {
